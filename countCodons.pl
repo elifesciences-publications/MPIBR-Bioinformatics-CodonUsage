@@ -23,9 +23,8 @@ use warnings;
 use strict;
 use Getopt::Long();
 
-sub parseGBKRecord($$);
-sub printInfo($);
-sub printCodons($$);
+sub parseGenBankFile($$);
+sub printCodonTable($$$);
 sub usage($);
 
 # main body
@@ -33,8 +32,6 @@ MAIN:{
     
     # query file name
     my $gbk_file;
-    my $gbk_prot;
-    my $gbk_rna;
     my $help;
     
     # set-up input parameters
@@ -43,7 +40,6 @@ MAIN:{
     "help" => \$help
     ) or usage("Error :: invalid command line options");
     
-    
     # default help output
     usage("version 1.0, Sep 2016") if($help);
     
@@ -51,162 +47,182 @@ MAIN:{
     usage("Error :: gz compressed GenBank is required") unless defined($gbk_file);
     
     # record counter
-    my $counter = 0;
-    my %codons = ();
+    my %codon_table = ();
     
-    my @codon_tbl = (
-    "ATT", "ATC", "ATA", # I isoleucine
-    "CTT", "CTC", "CTA", "CTG", "TTA", "TTG", # L leucine
-    "GTT", "GTC", "GTA", "GTG", # V valine
-    "TTT", "TTC", # F phenylalanine
-    "ATG", # M methionine
-    "TGT", "TGC", # C cysteine
-    "GCT", "GCC", "GCA", "GCG", # A alanine
-    "GGT", "GGC", "GGA", "GGG", # G glycine
-    "CCT", "CCC", "CCA", "CCG", # P proline
-    "ACT", "ACC", "ACA", "ACG", # T threonine
-    "TCT", "TCC", "TCA", "TCG", "AGT", "AGC", # S serine
-    "TAT", "TAC", # Y tyrosine
-    "TGG", # W tryptophan
-    "CAA", "CAG", # Q glutamine
-    "AAT", "AAC", # N asparagine
-    "CAT", "CAC", # H histidine
-    "GAA", "GAG", # E glutamic acid
-    "GAT", "GAC", # D aspartic acid
-    "AAA", "AAG", # K lysine
-    "CGT", "CGC", "CGA", "CGG", "AGA", "AGG", # R arginine
-    "TAA", "TAG", "TGA" # stop codons
+    my %genetic_code = (
+    'TCA' => 'S',    # Serine
+    'TCC' => 'S',    # Serine
+    'TCG' => 'S',    # Serine
+    'TCT' => 'S',    # Serine
+    'TTC' => 'F',    # Phenylalanine
+    'TTT' => 'F',    # Phenylalanine
+    'TTA' => 'L',    # Leucine
+    'TTG' => 'L',    # Leucine
+    'TAC' => 'Y',    # Tyrosine
+    'TAT' => 'Y',    # Tyrosine
+    'TAA' => '*',    # Stop
+    'TAG' => '*',    # Stop
+    'TGC' => 'C',    # Cysteine
+    'TGT' => 'C',    # Cysteine
+    'TGA' => '*',    # Stop
+    'TGG' => 'W',    # Tryptophan
+    'CTA' => 'L',    # Leucine
+    'CTC' => 'L',    # Leucine
+    'CTG' => 'L',    # Leucine
+    'CTT' => 'L',    # Leucine
+    'CCA' => 'P',    # Proline
+    'CCC' => 'P',    # Proline
+    'CCG' => 'P',    # Proline
+    'CCT' => 'P',    # Proline
+    'CAC' => 'H',    # Histidine
+    'CAT' => 'H',    # Histidine
+    'CAA' => 'Q',    # Glutamine
+    'CAG' => 'Q',    # Glutamine
+    'CGA' => 'R',    # Arginine
+    'CGC' => 'R',    # Arginine
+    'CGG' => 'R',    # Arginine
+    'CGT' => 'R',    # Arginine
+    'ATA' => 'I',    # Isoleucine
+    'ATC' => 'I',    # Isoleucine
+    'ATT' => 'I',    # Isoleucine
+    'ATG' => 'M',    # Methionine
+    'ACA' => 'T',    # Threonine
+    'ACC' => 'T',    # Threonine
+    'ACG' => 'T',    # Threonine
+    'ACT' => 'T',    # Threonine
+    'AAC' => 'N',    # Asparagine
+    'AAT' => 'N',    # Asparagine
+    'AAA' => 'K',    # Lysine
+    'AAG' => 'K',    # Lysine
+    'AGC' => 'S',    # Serine
+    'AGT' => 'S',    # Serine
+    'AGA' => 'R',    # Arginine
+    'AGG' => 'R',    # Arginine
+    'GTA' => 'V',    # Valine
+    'GTC' => 'V',    # Valine
+    'GTG' => 'V',    # Valine
+    'GTT' => 'V',    # Valine
+    'GCA' => 'A',    # Alanine
+    'GCC' => 'A',    # Alanine
+    'GCG' => 'A',    # Alanine
+    'GCT' => 'A',    # Alanine
+    'GAC' => 'D',    # Aspartic Acid
+    'GAT' => 'D',    # Aspartic Acid
+    'GAA' => 'E',    # Glutamic Acid
+    'GAG' => 'E',    # Glutamic Acid
+    'GGA' => 'G',    # Glycine
+    'GGC' => 'G',    # Glycine
+    'GGG' => 'G',    # Glycine
+    'GGT' => 'G',    # Glycine
     );
     
+    my %aminoacid_map = (
+    'A' => 'Ala', 'R' => 'Arg', 'N' => 'Asn', 'D' => 'Asp',
+    'C' => 'Cys', 'Q' => 'Gln', 'E' => 'Glu', 'G' => 'Gly',
+    'H' => 'His', 'I' => 'Ile', 'L' => 'Leu', 'K' => 'Lys',
+    'M' => 'Met', 'F' => 'Phe', 'P' => 'Pro', 'S' => 'Ser',
+    'T' => 'Thr', 'W' => 'Trp', 'Y' => 'Tyr', 'V' => 'Val',
+    'B' => 'Asx', 'Z' => 'glx', 'X' => 'Xaa', '*' => 'Stop'
+    );
     
-    # open file to read
-    open(my $fh, "gzcat $gbk_file |") or die("Can't open $gbk_file to read!\n");
+    # parse GenBank file
+    parseGenBankFile($gbk_file, \%codon_table);
     
-    # record separator
-    local $/ = "//\n";
-    
-    # print header line
-    #print "#Symbol\tRefSeqID\tRefSeqRef\tEntrezID\tGI\tLength\tOrganism\tDescription\n";
-    print "#Symbol\tRefSeqID\t",join("\t",@codon_tbl),"\n";
-    
-    # loop through each record
-    while(my $record = <$fh>)
-    {
-        # remove new line
-        chomp($record);
-        
-        # parse GBK record
-        my $info = parseGBKRecord($record, \%codons);
-        
-        # print info
-        #printInfo($info);
-        
-        # increment record counter
-        $counter++;
-        
-        #last;
-    }
-    close($fh);
-    
-    #print condon table
-    printCodons(\%codons, \@codon_tbl);
-    
-    #print $record,"\n";
-    print STDERR $counter,"\n";
-    
+    # print codon table
+    printCodonTable(\%codon_table, \%genetic_code, \%aminoacid_map);
 }
 
 ### --- SUBROUTINES --- ###
-sub parseGBKRecord($$)
+sub printCodonTable($$$)
 {
-    # get locally a record
-    my $record = $_[0];
-    my $codons_ref = $_[1];
+    my $codon_table_ref = $_[0];
+    my $genetic_code = $_[1];
+    my $aminoacid_map = $_[2];
     
-    # parse features
-    my $symbol = ($record =~ m/\/gene=\"(.+)\"/) ? $1 : "<symbol>";
+    # print header
+    print "# Gene.Symbol\t";
+    print "Transcript\t";
+    my @list_codons = sort keys %{$genetic_code};
+    my @list_aa = ();
+    my @list_abbreviation = ();
     
-    my $refseq_id = ($record =~ m/LOCUS\s+([ANXY][MPR]\_[0-9]+)/) ? $1 : "<refseq_id>";
-    
-    my $entrez_id = ($record =~ m/\/db_xref=\"GeneID:([0-9]+)\"/) ? $1 : "<entrez_id>";
-    
-    my $refseq_ref = ($record =~ m/\/protein_id=\"(?:.*)([ANXY][MRP]\_[0-9]+)/) ? $1 : "<refseq_ref>";
-    if ($refseq_ref eq "<refseq_ref>")
+    foreach (@list_codons)
     {
-        $refseq_ref = ($record =~ m/\/coded_by=\"(?:.*)([ANXY][MRP]\_[0-9]+)/) ? $1 : "<refseq_ref>";
+        my $aa = $genetic_code->{$_};
+        push(@list_aa, $aa);
+        push(@list_abbreviation, $aminoacid_map->{$aa});
     }
     
-    my $gi_prot = ($record =~ m/GI\:([0-9]+)/) ? $1 : "<gi_prot>";
+    print join("\t",@list_codons),"\n";
+    print "#\t#\t",join("\t", @list_aa),"\n";
+    print "#\t#\t",join("\t", @list_abbreviation),"\n";
     
-    my $organism = ($record =~ m/ORGANISM\s+(.+)\n/) ? $1 : "<organism>";
-    
-    my $length = ($record =~ m/LOCUS\s+[ANXY][MPR]\_[0-9]+\s+([0-9]+)\s/) ? $1 : "<length>";
-    
-    my $description = ($record =~ m/DEFINITION\s+(.+)ACCESSION/s) ? $1 : "<description>";
-    
-    # clean description
-    $description =~ s/\n//g;
-    $description =~ s/ +/ /g;
-    $description =~ s/ \[$organism\]\.//g;
-    $description =~ s/\s?$organism//g;
-    
-    # get CDS positions
-    my $cds_start = ($record =~ m/CDS\s+(\d+)/) ? $1 : "<unknown>";
-    my $cds_end = ($record =~ m/CDS\s+\d+\.\.(\d+)/) ? $1 : "<unknown>";
-    
-    # get sequence
-    my $seq_start = index($record, "ORIGIN");
-    my $seq_record = substr($record, $seq_start, length($record) - $seq_start);
-    $seq_record =~ s/[^acgtn]//g;
-    $seq_record =~ tr/[acgtn]/[ACGTN]/;
-    
-    # count codons
-    if (($cds_start ne "<unknown>") && ($cds_end ne "<unknown>"))
+    # print counts
+    foreach my $gene (sort keys %{$codon_table_ref})
     {
-        for (my $k = $cds_start - 1; $k < $cds_end; $k+=3)
-        {
-            my $codon = substr($seq_record, $k, 3);
-            $codons_ref->{$symbol}{$refseq_id}{$codon}++;
-        }
-    }
-    
-    # Return result
-    return [$symbol, $refseq_id, $refseq_ref, $entrez_id, $gi_prot, $length, $organism, $description];
-    
-}
-
-
-sub printInfo($)
-{
-    my $info_ref = shift;
-    my $info_siz = scalar(@{$info_ref});
-    for(my $k = 0; $k < $info_siz; $k++)
-    {
-        print $info_ref->[$k],"\t" if ($k < ($info_siz - 1));
-        print $info_ref->[$k],"\n" if ($k == ($info_siz - 1));
-    }
-    
-}
-
-sub printCodons($$)
-{
-    my $codon_ref = $_[0];
-    my $codon_tbl = $_[1];
-    
-    foreach my $gene (sort keys %{$codon_ref})
-    {
-        foreach my $transcript (sort keys %{$codon_ref->{$gene}})
+        foreach my $transcript (sort keys %{$codon_table_ref->{$gene}})
         {
             my @count = ();
-            foreach my $codon (@{$codon_tbl})
+            foreach my $codon (@list_codons)
             {
-                my $value = exists($codon_ref->{$gene}{$transcript}{$codon}) ? $codon_ref->{$gene}{$transcript}{$codon} : 0;
+                my $value = exists($codon_table_ref->{$gene}{$transcript}{$codon}) ? $codon_table_ref->{$gene}{$transcript}{$codon} : 0;
                 push(@count, $value);
             }
             
             print $gene,"\t",$transcript,"\t",join("\t", @count),"\n";
         }
     }
+}
+
+
+
+sub parseGenBankFile($$)
+{
+    my $gbk_file = $_[0];
+    my $codon_table_ref = $_[1];
+    my $count_records = 0;
+    my $count_protein_coding = 0;
+    
+    # open file to read
+    open(my $fh, "gunzip -c $gbk_file |") or die("Can't open $gbk_file to read!\n");
+    
+    # record separator
+    local $/ = "//\n";
+    
+    # loop through each record
+    while(my $record = <$fh>)
+    {
+        # remove new line
+        chomp($record);
+        $count_records++;
+        next if ($record !~ m/\/protein_id=/);
+        
+        # parse features
+        my $symbol = ($record =~ m/\/gene=\"(.+)\"/) ? $1 : "<symbol>";
+        my $refseq_id = ($record =~ m/LOCUS\s+([ANXY][MPR]\_[0-9]+)/) ? $1 : "<refseq_id>";
+        my $cds_start = ($record =~ m/CDS\s+(\d+)/) ? $1 : -1;
+        my $cds_end = ($record =~ m/CDS\s+\d+\.\.(\d+)/) ? $1 : -1;
+        next if (($cds_start == -1) || ($cds_end == -1));
+        
+        # parse sequence
+        my $seq_start = index($record, "ORIGIN");
+        my $seq_record = substr($record, $seq_start, length($record) - $seq_start);
+        $seq_record =~ s/[^acgtn]//g;
+        $seq_record =~ tr/[acgtn]/[ACGTN]/;
+        
+        # count codons
+        for (my $k = $cds_start - 1; $k < $cds_end; $k+=3)
+        {
+            my $codon = substr($seq_record, $k, 3);
+            $codon_table_ref->{$symbol}{$refseq_id}{$codon}++;
+        }
+        
+        $count_protein_coding++;
+    }
+    close($fh);
+    
+    print STDERR "GenBank records: ", $count_records, "\n";
+    print STDERR "GenBank protein coding: ", $count_protein_coding, "\n";
 }
 
 
