@@ -4,143 +4,26 @@ clear variables
 close all
 
 %% read codon table
-fmt = repmat({'%n'}, 66, 1);
-fmt(1:2) = {'%s'};
-fmt = sprintf('%s ', fmt{:});
-fmt(end) = [];
+fmt_header = repmat({'%s'}, 66, 1);
+fmt_header(1:2) = {'%*s'};
+fmt_header = sprintf('%s ', fmt_header{:});
+fmt_header(end) = [];
 
-fh = fopen('mm10_codonCount_03May2018.txt', 'r');
-hdr = fgetl(fh);
-txt = textscan(fh, fmt, 'delimiter', '\t');
+fmt_counts = repmat({'%n'}, 66, 1);
+fmt_counts(1:2) = {'%s'};
+fmt_counts = sprintf('%s ', fmt_counts{:});
+fmt_counts(end) = [];
+
+fh = fopen('codonTable_mouse_05Aug2017.txt', 'r');
+list_codons = textscan(fh, fmt_header, 1, 'delimiter', '\t');
+list_codons = [list_codons{:}]';
+list_aa = textscan(fh, fmt_header, 1, 'delimiter', '\t');
+list_aa = [list_aa{:}]';
+list_abr = textscan(fh, fmt_header, 1, 'delimiter', '\t');
+list_abr = [list_abr{:}]';
+txt = textscan(fh, fmt_counts, 'delimiter', '\t');
 fclose(fh);
-genes = txt{1};
+symbols = txt{1};
 transcripts = txt{2};
 counts = [txt{3:end}];
 
-%% codon label
-codon_label = regexp(hdr, '\t', 'split');
-codon_label(1:2) = [];
-
-%% codon group
-codon_aa = [repmat({'I'},1,3),...
-            repmat({'L'},1,6),...
-            repmat({'V'},1,4),...
-            repmat({'F'},1,2),...
-            repmat({'M'},1,1),...
-            repmat({'C'},1,2),...
-            repmat({'A'},1,4),...
-            repmat({'G'},1,4),...
-            repmat({'P'},1,4),...
-            repmat({'T'},1,4),...
-            repmat({'S'},1,6),...
-            repmat({'Y'},1,2),...
-            repmat({'W'},1,1),...
-            repmat({'Q'},1,2),...
-            repmat({'N'},1,2),...
-            repmat({'H'},1,2),...
-            repmat({'E'},1,2),...
-            repmat({'D'},1,2),...
-            repmat({'K'},1,2),...
-            repmat({'R'},1,6),...
-            repmat({'*'},1,3)];
- 
-codon_map = {'Ile',...
-             'Leu',...
-             'Val',...
-             'Phe',...
-             'Met',...
-             'Cys',...
-             'Ala',...
-             'Gly',...
-             'Pro',...
-             'Thr',...
-             'Ser',...
-             'Tyr',...
-             'Trp',...
-             'Gln',...
-             'Asn',...
-             'His',...
-             'Glu',...
-             'Asp',...
-             'Lys',...
-             'Arg',...
-             'Stop'};        
-
-%% observed frequency        
-total = sum(counts(:));
-ydata = sum(counts, 1) ./ total;
-xdata = (1:64);
-cdata = hsv(21);
-cmix = Shuffle(21, 'index');
-cdata = cdata(cmix,:);
-
-%% translation score
-score = sum(counts,2)./sum(bsxfun(@times, counts, ydata), 2);
-
-%% query lists
-idx = strcmp('Eif2ak1',genes);
-query = {'Eif2ak2','Eif2ak3','Rheb','Rps6kb1','Mapk3'};
-idxq = contains(genes, query);
-
-
-fh = fopen('list_kinase.txt','r');
-txt = textscan(fh,'%s','delimiter','\n');
-fclose(fh);
-kinase = txt{1};
-idxk = contains(genes, kinase, 'IgnoreCase', true);
-
-figure('color','w');
-[n,x] = hist(score(idxk | idxq), 100);
-n = n ./max(n);
-h(1) = bar(x, n);
-hold on;
-h(2) = plot([mean(score(idx)), mean(score(idx))],[0,1],'r', 'LineWidth',1.2);
-hold off;
-set(h(1), 'edgecolor',[.25,.25,.25],'facecolor',[.85,.85,.85]);
-set(gca,'box','off');
-xlabel('translation score [number of codons / available codons]');
-ylabel('relative frequency');
-hl = legend(h,'kinases','Eif2ak1');
-set(hl,'edgecolor','w');
-print(gcf,'-dpng','-r300','figureX_CodonScore.png');
-
-%% expected frequency
-%
-N = 100;
-odata = zeros(N, 64);
-for s = 1 : N
-    
-    idxrnd = Shuffle(counts, 2);
-    odata(s,:) = sum(idxrnd, 1) ./ total;
-    
-end
-%}
-
-%% plot
-%
-idxlegend = ([true; diff(char(codon_aa')) ~= 0]);
-idxgroup = cumsum(idxlegend);
-cdata = cdata(idxgroup, :);
-h = zeros(64, 1);
-
-figure('color','w');
-hold('on');
-for k = 1 : 64
-    h(k) = bar(xdata(k), ydata(k), 0.45);
-    set(h(k), 'edgecolor', [.25, .25, .25], 'facecolor', cdata(k,:));
-end
-
-ho = plot(median(odata,1),'k');
-%plot(mean(odata,1) + 5.*std(odata,1),'-.','color',[.65,.65,.65]);
-%plot(mean(odata,1) - 5.*std(odata,1),'-.','color',[.65,.65,.65]);
-hold('off');
-hl = legend([h(idxlegend);ho], [codon_map,{'expected'}]);
-set(hl,'edgecolor','w','location','eastoutside');
-set(gca,'box','off',...
-        'xlim',[0,65],...
-        'xtick',(1:64),...
-        'xticklabel',codon_label,...
-        'xticklabelrotation',90,...
-        'fontsize',8);
-ylabel('codon frequency');
-print(gcf,'-dpng','-r300','figureX_CodonFrequency.png');

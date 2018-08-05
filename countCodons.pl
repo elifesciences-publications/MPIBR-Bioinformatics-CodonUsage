@@ -153,6 +153,13 @@ sub printCodonTable($$$)
         push(@list_abbreviation, $aminoacid_map->{$aa});
     }
     
+    # sort based on AminoAcid letter
+    my @index_sort = sort {$list_aa[$a] cmp $list_aa[$b]} 0..$#list_aa;
+    @list_codons = @list_codons[@index_sort];
+    @list_aa = @list_aa[@index_sort];
+    @list_abbreviation = @list_abbreviation[@index_sort];
+    
+    
     print join("\t",@list_codons),"\n";
     print "#\t#\t",join("\t", @list_aa),"\n";
     print "#\t#\t",join("\t", @list_abbreviation),"\n";
