@@ -27,3 +27,20 @@ symbols = txt{1};
 transcripts = txt{2};
 counts = [txt{3:end}];
 
+counts_total = sum(counts, 1);
+w = zeros(length(counts_total), 1);
+[~, ~, idx_group] = unique(list_aa);
+for g = 1 : max(idx_group)
+    
+    %% calculate for the total
+    w_aa = counts_total(idx_group == g) ./ sum(counts_total(idx_group == g));
+    w(idx_group == g) = w_aa ./ max(w_aa);
+    
+end
+
+cai = exp(sum(bsxfun(@times, counts, log(w')), 2) ./ (sum(counts, 2) - 1));
+
+
+
+
+

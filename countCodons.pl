@@ -129,7 +129,7 @@ MAIN:{
     parseGenBankFile($gbk_file, \%codon_table);
     
     # print codon table
-    printCodonTable(\%codon_table, \%genetic_code, \%aminoacid_map);
+    #printCodonTable(\%codon_table, \%genetic_code, \%aminoacid_map);
 }
 
 ### --- SUBROUTINES --- ###
@@ -217,13 +217,20 @@ sub parseGenBankFile($$)
         $seq_record =~ s/[^acgtn]//g;
         $seq_record =~ tr/[acgtn]/[ACGTN]/;
         
+        if (($cds_end - $cds_start) > 0)
+        {
+            print $refseq_id,";",$symbol,"\t",substr($seq_record, $cds_start - 1, $cds_end - $cds_start + 1),"\n";
+        }
+        
+        
         # count codons
+=head
         for (my $k = $cds_start - 1; $k < $cds_end; $k+=3)
         {
             my $codon = substr($seq_record, $k, 3);
             $codon_table_ref->{$symbol}{$refseq_id}{$codon}++;
         }
-        
+=cut
         $count_protein_coding++;
     }
     close($fh);
