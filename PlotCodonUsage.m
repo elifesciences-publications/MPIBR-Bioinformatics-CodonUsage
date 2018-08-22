@@ -64,6 +64,15 @@ cai_query = mean(cai(idx_query));
 cai_median = median(cai(idx_base));
 cai_kinases = median(cai(idx_base & idx_kinases));
 
+% inverse percentile
+X = cai(idx_base);
+Q = cai_query;
+nless = sum(X < Q);
+nequal = sum(X == Q);
+centile = 100 * (nless + 0.5*nequal) / length(X);
+
+
+%{
 figure('color','w');
 hold on;
 h(1) = plot(E_all(1:end-1), N_all./max(N_all),'k','linewidth',1.2);
