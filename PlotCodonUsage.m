@@ -43,6 +43,7 @@ end
 cai = exp(sum(bsxfun(@times, counts, log(w')), 2) ./ (sum(counts, 2) - 1));
 
 
+%{
 idx_base = ww > 0;
 idx_query = strcmp(data.symbols, 'Eif2ak1');
 
@@ -70,7 +71,7 @@ Q = cai_query;
 nless = sum(X < Q);
 nequal = sum(X == Q);
 centile = 100 * (nless + 0.5*nequal) / length(X);
-
+%}
 
 %{
 figure('color','w');
