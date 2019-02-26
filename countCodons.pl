@@ -228,11 +228,10 @@ sub parseGenBankFile($$)
         for (my $k = $cds_start - 1; $k < $cds_end; $k+=3)
         {
             my $codon = substr($seq_record, $k, 3);
-            next if(!defined($codon));
-            next if(!exists($codon_table_ref->{$symbol}{$refseq_id}{$codon}));
             $codon_table_ref->{$symbol}{$refseq_id}{$codon}++;
         }
         $count_protein_coding++;
+        #last if($count_protein_coding == 20000);
     }
     close($fh);
     
